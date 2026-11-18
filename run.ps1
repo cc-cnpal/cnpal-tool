@@ -2,14 +2,14 @@
 # Usage (PowerShell):
 #   irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/run.ps1 | iex
 #
-# Downloads the latest release, extracts it to %LOCALAPPDATA%\CNPAL-Tool\app,
+# Downloads the latest build (dist/ in this repo), extracts it to %LOCALAPPDATA%\CNPAL-Tool\app,
 # and starts the local dashboard in your browser. Nothing is installed.
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'   # much faster Invoke-WebRequest
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$url  = 'https://github.com/cc-cnpal/cnpal-tool/releases/latest/download/CNPAL-Tool-Windows.zip'
+$url  = 'https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/dist/CNPAL-Tool-Windows.zip'
 $base = Join-Path $env:LOCALAPPDATA 'CNPAL-Tool'
 $dir  = Join-Path $base 'app'
 $zip  = Join-Path $env:TEMP 'CNPAL-Tool-Windows.zip'

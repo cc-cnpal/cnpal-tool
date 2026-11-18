@@ -23,7 +23,7 @@ Open **PowerShell** and run:
 irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/run.ps1 | iex
 ```
 
-It downloads the latest release, extracts it to `%LOCALAPPDATA%\CNPAL-Tool\app` and opens the
+It downloads the latest version, extracts it to `%LOCALAPPDATA%\CNPAL-Tool\app` and opens the
 dashboard in your browser. Nothing is installed. Run the same command again to update.
 
 ## Assurance mode
@@ -35,9 +35,9 @@ A live progress bar shows calls done, pending, elapsed time and time remaining. 
 
 ## Download
 
-**[Download the latest version (CNPAL-Tool-Windows.zip)](../../releases/latest/download/CNPAL-Tool-Windows.zip)**
+**[Download the latest version (CNPAL-Tool-Windows.zip)](../../raw/main/dist/CNPAL-Tool-Windows.zip)**
 
-Only download the tool from this page's **Releases** section.
+Only download the tool from this page (the `dist` folder of this repository).
 
 ## Run it
 
@@ -57,7 +57,7 @@ In PowerShell, in the folder where you saved the zip:
 Get-FileHash .\CNPAL-Tool-Windows.zip -Algorithm SHA256
 ```
 
-The result must match the SHA-256 value listed in the release notes.
+The result must match the value in [dist/SHA256.txt](dist/SHA256.txt).
 
 ## Requirements
 
