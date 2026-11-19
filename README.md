@@ -26,6 +26,18 @@ irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/run.ps1 | iex
 It downloads the latest version, extracts it to `%LOCALAPPDATA%\CNPAL-Tool\app` and opens the
 dashboard in your browser. Nothing is installed. Run the same command again to update.
 
+## If the .exe is blocked ("Access is denied")
+
+Some company PCs block downloaded programs. Use the PowerShell edition instead: no .exe, nothing
+installed, same read-only calls for the Campus Network Programmability and Integration use case
+(GET calls plus Assurance query calls), about 4 minutes:
+
+```powershell
+irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/cnpal.ps1 | iex
+```
+
+It asks for the Catalyst Center address and a username/password (a read-only account is enough).
+
 ## Assurance mode
 
 For the Catalyst Center Assurance use case, connect and click **Run Assurance workload** on the
