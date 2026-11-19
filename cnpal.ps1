@@ -15,7 +15,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.0'
+$Version = '1.0.1'
 
 # ------------------------------------------------------------------ targets
 # Adopt needs 100 GET across >=10 endpoints and 50 non-GET across >=4 endpoints
@@ -165,7 +165,10 @@ function Connect-CC {
       $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch {}
       if ($code -eq 401) { throw 'Login failed: wrong username or password (HTTP 401).' }
       if ($code -eq 404) { continue }
-      throw "Cannot reach Catalyst Center at $($script:Base): $($_.Exception.Message)"
+      $m = $_.Exception.Message
+      $in = $_.Exception.InnerException
+      while ($in) { $m += ' | ' + $in.Message; $in = $in.InnerException }
+      throw "Cannot reach Catalyst Center at $($script:Base): $m"
     }
   }
   throw 'Login failed: no token returned.'
@@ -185,17 +188,67 @@ $script:Base = $hostIn
 $script:Cred = Get-Credential -Message 'Catalyst Center username and password (a read-only OBSERVER account is enough)'
 if (-not $script:Cred) { Write-Bad 'No credentials entered. Stopping.'; return }
 
-# TLS: trust the Catalyst Center certificate for this session (many use a self-signed one).
+# TLS (Windows PowerShell 5.1): accept the Catalyst Center certificate (often
+# self-signed) and allow TLS 1.2 and 1.3. If the first login attempt fails at the
+# TLS level, other protocol settings are tried automatically.
+$script:TlsOptions = @()
 if (-not $script:IsPS7) {
-  try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
-  try { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true } } catch {
-    Write-Bad 'This PC does not allow skipping certificate checks in Windows PowerShell 5.1.'
-    Write-Bad 'If login fails with a certificate/SSL error, use the Catalyst Center hostname that matches its certificate, or run this in PowerShell 7 (pwsh).'
+  $certOk = $false
+  try {
+    if (-not ('CnpalTrustAll' -as [type])) {
+      Add-Type -TypeDefinition @"
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+public class CnpalTrustAll : ICertificatePolicy {
+  public bool CheckValidationResult(ServicePoint sp, X509Certificate cert, WebRequest req, int problem) { return true; }
+}
+"@
+    }
+    [Net.ServicePointManager]::CertificatePolicy = New-Object CnpalTrustAll
+    $certOk = $true
+  } catch {}
+  if (-not $certOk) {
+    try { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }; $certOk = $true } catch {}
   }
+  if (-not $certOk) {
+    Write-Bad 'This PC does not allow skipping certificate checks in Windows PowerShell 5.1.'
+    Write-Bad 'If login fails, use the Catalyst Center hostname that matches its certificate, or run this in PowerShell 7 (pwsh).'
+  }
+  try { [Net.ServicePointManager]::Expect100Continue = $false } catch {}
+  # 3072 = TLS 1.2, 12288 = TLS 1.3, 0 = let Windows decide
+  $script:TlsOptions = @(
+    @{ n = 'TLS 1.2 + 1.3'; v = (3072 -bor 12288) },
+    @{ n = 'Windows default'; v = 0 },
+    @{ n = 'TLS 1.2 only'; v = 3072 },
+    @{ n = 'TLS 1.3 only'; v = 12288 }
+  )
+}
+
+function Set-Tls($o) {
+  try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]$o.v; return $true } catch { return $false }
 }
 
 Write-Step 'Logging in'
-try { Connect-CC | Out-Null; Write-Ok "Connected to $($script:Base)" } catch { Write-Bad $_.Exception.Message; return }
+$connected = $false; $lastErr = $null
+$opts = if ($script:TlsOptions.Count) { $script:TlsOptions } else { @(@{ n = 'PowerShell 7 default'; v = $null }) }
+foreach ($o in $opts) {
+  if ($o.v -ne $null) { if (-not (Set-Tls $o)) { continue } }
+  try {
+    Connect-CC | Out-Null
+    $connected = $true
+    Write-Ok "Connected to $($script:Base) ($($o.n))"
+    break
+  } catch {
+    $lastErr = $_.Exception.Message
+    if ($lastErr -like 'Login failed*') { break }
+    Write-Skip "Connection with $($o.n) failed, trying the next setting..."
+  }
+}
+if (-not $connected) {
+  Write-Bad $lastErr
+  Write-Bad 'Could not open a secure connection from this PC. Options: run this in PowerShell 7 (pwsh), or from another PC that can reach Catalyst Center.'
+  return
+}
 
 $ver = Invoke-CC 'GET' '/dna/intent/api/v1/dnac-release'
 if ($ver.ok) {
