@@ -15,7 +15,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.1'
+$Version = '1.0.2'
 
 # ------------------------------------------------------------------ targets
 # Adopt needs 100 GET across >=10 endpoints and 50 non-GET across >=4 endpoints
@@ -205,6 +205,9 @@ public class CnpalTrustAll : ICertificatePolicy {
 "@
     }
     [Net.ServicePointManager]::CertificatePolicy = New-Object CnpalTrustAll
+    # Clear a script-block callback left in this window by an older run; it
+    # breaks every HTTPS connection when called on a background thread.
+    [Net.ServicePointManager]::ServerCertificateValidationCallback = $null
     $certOk = $true
   } catch {}
   if (-not $certOk) {
