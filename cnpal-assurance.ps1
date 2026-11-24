@@ -18,7 +18,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.0'
+$Version = '1.0.1'
 $GapMs   = 700          # pause between calls
 $SlowMs  = 5000         # endpoints slower than this are set aside if faster ones work
 
@@ -302,8 +302,11 @@ $hostIn = Read-Host 'Catalyst Center address (IP or hostname)'
 $hostIn = $hostIn.Trim().TrimEnd('/')
 if ($hostIn -notmatch '^https?://') { $hostIn = 'https://' + $hostIn }
 $script:Base = $hostIn
-$script:Cred = Get-Credential -Message 'Catalyst Center username and password (a read-only OBSERVER account is enough)'
-if (-not $script:Cred) { Write-Bad 'No credentials entered. Stopping.'; return }
+Write-Host 'Catalyst Center username and password (a read-only OBSERVER account is enough)'
+$u = Read-Host 'Username'
+$pw = Read-Host 'Password' -AsSecureString
+if (-not $u -or -not $pw -or $pw.Length -eq 0) { Write-Bad 'No username or password entered. Stopping.'; return }
+$script:Cred = New-Object System.Management.Automation.PSCredential($u.Trim(), $pw)
 
 $mode = Read-Host 'Run type: press Enter for the FULL run (about 1 hour), or type T for a quick test (10 calls per group)'
 $test = $mode.Trim().ToUpper() -eq 'T'

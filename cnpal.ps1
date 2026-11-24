@@ -15,7 +15,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.2'
+$Version = '1.0.3'
 
 # ------------------------------------------------------------------ targets
 # Adopt needs 100 GET across >=10 endpoints and 50 non-GET across >=4 endpoints
@@ -185,8 +185,11 @@ $hostIn = Read-Host 'Catalyst Center address (IP or hostname)'
 $hostIn = $hostIn.Trim().TrimEnd('/')
 if ($hostIn -notmatch '^https?://') { $hostIn = 'https://' + $hostIn }
 $script:Base = $hostIn
-$script:Cred = Get-Credential -Message 'Catalyst Center username and password (a read-only OBSERVER account is enough)'
-if (-not $script:Cred) { Write-Bad 'No credentials entered. Stopping.'; return }
+Write-Host 'Catalyst Center username and password (a read-only OBSERVER account is enough)'
+$u = Read-Host 'Username'
+$pw = Read-Host 'Password' -AsSecureString
+if (-not $u -or -not $pw -or $pw.Length -eq 0) { Write-Bad 'No username or password entered. Stopping.'; return }
+$script:Cred = New-Object System.Management.Automation.PSCredential($u.Trim(), $pw)
 
 # TLS (Windows PowerShell 5.1): accept the Catalyst Center certificate (often
 # self-signed) and allow TLS 1.2 and 1.3. If the first login attempt fails at the
