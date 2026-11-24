@@ -38,6 +38,15 @@ irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/cnpal.ps1 | iex
 
 It asks for the Catalyst Center address and a username/password (a read-only account is enough).
 
+For the Campus Network Observability and Insights (Assurance) use case, use the PowerShell Assurance
+edition: the same read-only GET calls as the CNOI Workload button (network health, client health, Device/Client
+360, audit logs), about 1 hour. Every call is logged to a CSV in `Documents\CNOI-Assurance`. Type `T` at the
+run-type prompt for a quick 10-calls-per-group test.
+
+```powershell
+irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/cnpal-assurance.ps1 | iex
+```
+
 ## Dashboard
 
 Four buttons: **CN-PAL Workload**, **CNOI Workload** (Observability & Insights), **GBM Internal Report**
