@@ -47,6 +47,14 @@ run-type prompt for a quick 10-calls-per-group test.
 irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/cnpal-assurance.ps1 | iex
 ```
 
+A re-run tops up from the earlier call logs on the same PC. For a status report afterwards (HTML: platform,
+inventory and site assignment, issues resolved or ignored, sign-ins, and API activity from the call logs, plus a
+combined call-log CSV):
+
+```powershell
+irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/cnpal-report.ps1 | iex
+```
+
 ## Dashboard
 
 Four buttons: **CN-PAL Workload**, **CNOI Workload** (Observability & Insights), **GBM Internal Report**
