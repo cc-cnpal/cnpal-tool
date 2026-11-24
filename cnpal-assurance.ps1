@@ -18,7 +18,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.1'
+$Version = '1.0.2'
 $GapMs   = 700          # pause between calls
 $SlowMs  = 5000         # endpoints slower than this are set aside if faster ones work
 
@@ -192,7 +192,8 @@ function Invoke-StaticGroup($g, [int]$n) {
     $usable = @($good | Where-Object { $_.fails -lt 3 })
     if (-not $usable.Count) { Write-Bad 'All endpoints in this group failed; stopping this group to protect the API error rate.'; break }
     $fast = @($usable | Where-Object { $_.lat -le $SlowMs })
-    $pool = if ($fast.Count) { $fast } else { $usable }
+    $pool = $usable
+    if ($fast.Count) { $pool = $fast }
     $e = $pool[$i % $pool.Count]; $i++
     $r = Invoke-CC 'GET' $e.p
     $e.lat = [int](($e.lat * 3 + $r.ms) / 4)
@@ -273,7 +274,8 @@ function Invoke-360Group([int]$n) {
     $usable = @($live | Where-Object { $_.fails -lt 5 })
     if (-not $usable.Count) { Write-Bad 'All 360 APIs failed; stopping this group to protect the API error rate.'; break }
     $fast = @($usable | Where-Object { $_.lat -le $SlowMs })
-    $pool = if ($fast.Count) { $fast } else { $usable }
+    $pool = $usable
+    if ($fast.Count) { $pool = $fast }
     $t = $pool[$i % $pool.Count]; $i++
     $list = if ($t.kind -eq 'device') { $devs } else { $cls }
     $id = $list[$cursor[$t.kind] % $list.Count]; $cursor[$t.kind]++
@@ -320,7 +322,7 @@ try {
   $dir = Join-Path $docs 'CNOI-Assurance'
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   $hn = ($script:Base -replace '^https?://', '') -replace '[^A-Za-z0-9.-]', '_'
-  $script:LogFile = Join-Path $dir ("api-call-log-{0}-{1}.csv" -f $hn, (Get-Date).ToString('yyyyMMdd-HHmm'))
+  $script:LogFile = Join-Path $dir ("api-call-log-{0}-{1}.csv" -f $hn, (Get-Date).ToString('yyyyMMdd-HHmmss'))
   Set-Content -Path $script:LogFile -Value 'timestamp_utc,timestamp_local,method,endpoint,http_status,result,response_ms,group' -Encoding UTF8
 } catch { $script:LogFile = $null; Write-Bad 'Could not create the call log file; continuing without it.' }
 
@@ -385,10 +387,37 @@ $ver = Invoke-CC 'GET' '/dna/intent/api/v1/dnac-release'
 if ($ver.ok) { Write-Ok "Catalyst Center release $($ver.data.response.displayVersion)" }
 
 # ------------------------------------------------------------------ run
-foreach ($g in $Groups) { $g.plan = if ($test) { 10 } else { $g.target }; $script:PlanTotal += $g.plan }
+# Calls already made from this PC to this Catalyst Center in the last 23 days
+# (earlier logs in the same folder) are counted, so a re-run only tops up.
+$have = @{}
+if (-not $test -and $script:LogFile) {
+  $cut = (Get-Date).ToUniversalTime().AddDays(-23)
+  Get-ChildItem -Path (Split-Path $script:LogFile) -Filter ("api-call-log-{0}-*.csv" -f $hn) -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -ne $script:LogFile } | ForEach-Object {
+      try {
+        foreach ($row in (Import-Csv -Path $_.FullName)) {
+          if ($row.result -ne 'success') { continue }
+          $t = [datetime]::MinValue
+          if (-not [datetime]::TryParse($row.timestamp_utc, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal, [ref]$t)) { continue }
+          if ($t -lt $cut) { continue }
+          $have[$row.group] = 1 + [int]$have[$row.group]
+        }
+      } catch {}
+    }
+}
+foreach ($g in $Groups) {
+  $done0 = [int]$have[$g.key]
+  $g.already = $done0
+  $g.plan = if ($test) { 10 } else { [math]::Max(0, $g.target - $done0) }
+  $script:PlanTotal += $g.plan
+}
+if (-not $test -and $script:PlanTotal -eq 0) {
+  Write-Step 'All four groups already reached their targets in the last 23 days (from earlier runs on this PC). Nothing to do.'
+  return
+}
 $mins = [int][math]::Ceiling($script:PlanTotal * ($GapMs + 300) / 60000)
 Write-Step ("{0} Assurance calls planned (about {1} minutes). Keep this window open and the PC awake." -f $script:PlanTotal, $mins)
-foreach ($g in $Groups) { Write-Host ("    {0,-62} {1,5} calls" -f $g.name, $g.plan) }
+foreach ($g in $Groups) { Write-Host ("    {0,-62} {1,5} calls{2}" -f $g.name, $g.plan, $(if ($g.already) { "  (already $($g.already) from earlier runs)" } else { "" })) }
 
 $script:T0 = Get-Date
 $script:Lost = $false
@@ -396,6 +425,7 @@ $results = @{}
 $gi = 0
 foreach ($g in $Groups) {
   $gi++
+  if ($g.plan -le 0) { Write-Skip "$($g.name): target already reached"; $results[$g.key] = 0; continue }
   $script:Group = $g.key; $script:GroupName = $g.name
   Write-Step "$($g.name)  (group $gi of $($Groups.Count))"
   $before = $script:Done
@@ -413,7 +443,7 @@ $total = $script:Ok + $script:Err
 $rate = if ($total) { [math]::Round($script:Err * 100.0 / $total, 1) } else { 0 }
 $dur = (Get-Date) - $script:T0
 Write-Step ('Finished in {0}m {1}s' -f [int][math]::Floor($dur.TotalMinutes), $dur.Seconds)
-foreach ($g in $Groups) { Write-Host ("  {0,-62} {1,5} successful" -f $g.name, [int]$results[$g.key]) }
+foreach ($g in $Groups) { Write-Host ("  {0,-62} {1,5} successful this run, {2,5} in total" -f $g.name, [int]$results[$g.key], ([int]$results[$g.key] + [int]$g.already)) }
 Write-Host ("  All calls: {0} successful, {1} errors ({2}%)" -f $script:Ok, $script:Err, $rate)
 if ($script:LogFile) { Write-Host ''; Write-Host "  Call log (CSV, every call with timestamp and result): $($script:LogFile)" -ForegroundColor White }
 Write-Host ''
