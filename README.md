@@ -38,6 +38,12 @@ irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/cnpal.ps1 | iex
 
 It asks for the Catalyst Center address and a username/password (a read-only account is enough).
 
+## Dashboard
+
+Four buttons: **CN-PAL Workload**, **CNOI Workload** (Observability & Insights), **GBM Internal Report**
+(assessment with lifecycle criteria) and **Cisco Report** (status report). On the Connect page you can enter
+the Catalyst Center serial number and Member ID from Help (?) > About; both reports show them.
+
 ## Status report
 
 **Generate status report** writes a Catalyst Center status report (Word) with the platform release, device
