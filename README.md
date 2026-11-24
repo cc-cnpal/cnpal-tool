@@ -38,6 +38,13 @@ irm https://raw.githubusercontent.com/cc-cnpal/cnpal-tool/main/cnpal.ps1 | iex
 
 It asks for the Catalyst Center address and a username/password (a read-only account is enough).
 
+## Status report
+
+**Generate status report** on the dashboard writes a Catalyst Center status report (Word) with the platform
+release, device inventory (site assignment, reachability, manageability, software versions), assurance health
+and the API activity recorded by the tool, plus `api-call-log.csv` with every request, its timestamp, endpoint
+and HTTP status.
+
 ## Assurance mode
 
 For the Catalyst Center Assurance use case, connect and click **Run Assurance workload** on the
