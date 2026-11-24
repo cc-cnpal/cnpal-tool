@@ -40,10 +40,16 @@ It asks for the Catalyst Center address and a username/password (a read-only acc
 
 ## Status report
 
-**Generate status report** on the dashboard writes a Catalyst Center status report (Word) with the platform
-release, device inventory (site assignment, reachability, manageability, software versions), assurance health
-and the API activity recorded by the tool, plus `api-call-log.csv` with every request, its timestamp, endpoint
-and HTTP status.
+**Generate status report** writes a Catalyst Center status report (Word) with the platform release, device
+inventory (site assignment, reachability, manageability, software versions), assurance health, API activity by
+area, issues resolved or ignored in the last 30 days, and Catalyst Center sign-ins from the platform's audit log.
+CSV files alongside it: `api-call-log.csv` (every request with timestamp, endpoint and HTTP status),
+`issues-closed-30d.csv`, `ui-logins-30d.csv` and `devices.csv`. A status report is also written automatically
+when an Assurance run finishes.
+
+## macOS
+
+Download [CNPAL-Tool-macOS.zip](../../raw/main/dist/CNPAL-Tool-macOS.zip), unzip it and double-click `Start.command`.
 
 ## Assurance mode
 
