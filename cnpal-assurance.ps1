@@ -18,7 +18,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.2'
+$Version = '1.0.3'
 $GapMs   = 700          # pause between calls
 $SlowMs  = 5000         # endpoints slower than this are set aside if faster ones work
 
@@ -92,13 +92,31 @@ $script:LastCall = Get-Date '2000-01-01'
 $script:Group = 'login'
 $script:LogFile = $null
 
+# Call log: rows are kept in memory and written in batches. If antivirus has
+# the file open, the batch is kept and retried, so no row is lost.
+$script:LogBuf = New-Object System.Collections.Generic.List[string]
+$script:LogLost = 0
+function Flush-CallLog([switch]$Final) {
+  if (-not $script:LogFile -or $script:LogBuf.Count -eq 0) { return }
+  $tries = if ($Final) { 40 } else { 3 }
+  for ($k = 0; $k -lt $tries; $k++) {
+    try {
+      $text = ($script:LogBuf -join "`r`n") + "`r`n"
+      [IO.File]::AppendAllText($script:LogFile, $text, (New-Object Text.UTF8Encoding($false)))
+      $script:LogBuf.Clear()
+      return
+    } catch { Start-Sleep -Milliseconds 250 }
+  }
+  if ($Final) { $script:LogLost += $script:LogBuf.Count }
+}
+
 function Write-CallLog($method, $path, $status, $ms) {
   if (-not $script:LogFile) { return }
   $now = Get-Date
   $res = if ($status -ge 200 -and $status -lt 300) { 'success' } else { 'error' }
-  $line = '{0},{1},{2},{3},{4},{5},{6},{7}' -f $now.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'),
-          $now.ToString('yyyy-MM-dd HH:mm:ss'), $method, (Get-LogEndpoint $path), $status, $res, $ms, $script:Group
-  try { Add-Content -Path $script:LogFile -Value $line -Encoding UTF8 } catch {}
+  $script:LogBuf.Add(('{0},{1},{2},{3},{4},{5},{6},{7}' -f $now.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'),
+          $now.ToString('yyyy-MM-dd HH:mm:ss'), $method, (Get-LogEndpoint $path), $status, $res, $ms, $script:Group))
+  if ($script:LogBuf.Count -ge 25) { Flush-CallLog }
 }
 
 function Invoke-CC([string]$method, [string]$path) {
@@ -323,7 +341,7 @@ try {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   $hn = ($script:Base -replace '^https?://', '') -replace '[^A-Za-z0-9.-]', '_'
   $script:LogFile = Join-Path $dir ("api-call-log-{0}-{1}.csv" -f $hn, (Get-Date).ToString('yyyyMMdd-HHmmss'))
-  Set-Content -Path $script:LogFile -Value 'timestamp_utc,timestamp_local,method,endpoint,http_status,result,response_ms,group' -Encoding UTF8
+  [IO.File]::WriteAllText($script:LogFile, "timestamp_utc,timestamp_local,method,endpoint,http_status,result,response_ms,group`r`n", (New-Object Text.UTF8Encoding($false)))
 } catch { $script:LogFile = $null; Write-Bad 'Could not create the call log file; continuing without it.' }
 
 # TLS (Windows PowerShell 5.1): accept the Catalyst Center certificate (often
@@ -433,9 +451,11 @@ foreach ($g in $Groups) {
   # keep the overall count honest if a group stopped early
   $script:PlanTotal -= ($g.plan - ($script:Done - $before))
   $results[$g.key] = $groupOk
+  Flush-CallLog -Final
   Write-Ok "$groupOk successful calls in this group"
   if ($script:Lost) { break }
 }
+Flush-CallLog -Final
 $ProgressPreference = 'Continue'; Write-Progress -Activity 'CNOI Assurance workload' -Completed; $ProgressPreference = 'SilentlyContinue'
 
 # ------------------------------------------------------------------ summary
@@ -446,6 +466,7 @@ Write-Step ('Finished in {0}m {1}s' -f [int][math]::Floor($dur.TotalMinutes), $d
 foreach ($g in $Groups) { Write-Host ("  {0,-62} {1,5} successful this run, {2,5} in total" -f $g.name, [int]$results[$g.key], ([int]$results[$g.key] + [int]$g.already)) }
 Write-Host ("  All calls: {0} successful, {1} errors ({2}%)" -f $script:Ok, $script:Err, $rate)
 if ($script:LogFile) { Write-Host ''; Write-Host "  Call log (CSV, every call with timestamp and result): $($script:LogFile)" -ForegroundColor White }
+if ($script:LogLost) { Write-Bad "$($script:LogLost) rows could not be written to the call log (file locked by another program)." }
 Write-Host ''
 Write-Host '  Issue resolution is done in the UI: Assurance > Issues > select > Resolve (or Ignore).'
 Write-Host '  Cisco reads these counts through telemetry; the portal can take a few days to update.'
