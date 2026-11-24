@@ -110,6 +110,15 @@ function Flush-CallLog([switch]$Final) {
   if ($Final) { $script:LogLost += $script:LogBuf.Count }
 }
 
+function Get-Release($data) {
+  $resp = $data.response
+  foreach ($k in 'displayVersion', 'installedVersion', 'systemVersion', 'version') {
+    if ($resp -and $resp.$k) { return [string]$resp.$k }
+    if ($data.$k) { return [string]$data.$k }
+  }
+  return ''
+}
+
 function Write-CallLog($method, $path, $status, $ms) {
   if (-not $script:LogFile) { return }
   $now = Get-Date
@@ -402,7 +411,7 @@ if (-not $connected) {
 
 $script:Group = 'platform'
 $ver = Invoke-CC 'GET' '/dna/intent/api/v1/dnac-release'
-if ($ver.ok) { Write-Ok "Catalyst Center release $($ver.data.response.displayVersion)" }
+if ($ver.ok) { $rel = Get-Release $ver.data; if ($rel) { Write-Ok "Catalyst Center release $rel" } else { Write-Ok 'Catalyst Center reachable' } }
 
 # ------------------------------------------------------------------ run
 # Calls already made from this PC to this Catalyst Center in the last 23 days

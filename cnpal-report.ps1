@@ -13,7 +13,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.0'
+$Version = '1.0.1'
 $GapMs   = 300
 $AllowedPOST = @('/dna/system/api/v1/auth/token', '/api/system/v1/auth/token')
 
@@ -86,6 +86,15 @@ function Connect-CC {
     }
   }
   throw 'Login failed: no token returned.'
+}
+
+function Get-Release($data) {
+  $resp = $data.response
+  foreach ($k in 'displayVersion', 'installedVersion', 'systemVersion', 'version') {
+    if ($resp -and $resp.$k) { return [string]$resp.$k }
+    if ($data.$k) { return [string]$data.$k }
+  }
+  return ''
 }
 
 function Get-Count($r) {
@@ -192,7 +201,9 @@ $startMs = Get-EpochMs $from; $endMs = Get-EpochMs $now
 Write-Step 'Collecting platform and inventory'
 $release = ''
 $r = Invoke-CC 'GET' '/dna/intent/api/v1/dnac-release'
-if ($r.ok) { $release = $r.data.response.displayVersion; Write-Ok "Release $release" }
+if ($r.ok) { $release = Get-Release $r.data }
+if (-not $release) { $r = Invoke-CC 'GET' '/api/system/v1/maglev/release/current'; if ($r.ok) { $release = Get-Release $r.data } }
+if ($release) { Write-Ok "Release $release" } else { Write-Skip 'Release not reported by the API' }
 
 $devices = New-Object System.Collections.ArrayList
 for ($off = 1; $off -le 20000; $off += 500) {
