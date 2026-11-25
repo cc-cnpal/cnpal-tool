@@ -15,7 +15,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.3'
+$Version = '1.0.4'
 
 # ------------------------------------------------------------------ targets
 # Adopt needs 100 GET across >=10 endpoints and 50 non-GET across >=4 endpoints
@@ -126,7 +126,7 @@ function Invoke-CC([string]$method, [string]$path, [string]$body = $null) {
   $wait = $GapMs - ((Get-Date) - $script:LastCall).TotalMilliseconds
   if ($wait -gt 0) { Start-Sleep -Milliseconds ([int]$wait) }
   $script:LastCall = Get-Date
-  $req = @{ Method = $method; Uri = ($script:Base + $path); TimeoutSec = 90; ContentType = 'application/json'
+  $req = @{ Method = $method; Uri = ($script:Base + $path); MaximumRedirection = 0; TimeoutSec = 90; ContentType = 'application/json'
              Headers = @{ 'X-Auth-Token' = $script:Token; 'Accept' = 'application/json' } }
   if ($body) { $req.Body = $body }
   if ($script:IsPS7) { $req.SkipCertificateCheck = $true } else { $req.UseBasicParsing = $true }
@@ -155,7 +155,7 @@ function Connect-CC {
   try { $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pair)) } catch {}
   foreach ($p in @('/dna/system/api/v1/auth/token', '/api/system/v1/auth/token')) {
     Assert-ReadOnly 'POST' $p
-    $req = @{ Method = 'POST'; Uri = ($script:Base + $p); TimeoutSec = 60; ContentType = 'application/json' }
+    $req = @{ Method = 'POST'; Uri = ($script:Base + $p); MaximumRedirection = 0; TimeoutSec = 60; ContentType = 'application/json' }
     if ($b64) { $req.Headers = @{ Authorization = "Basic $b64" } } else { $req.Credential = $script:Cred }
     if ($script:IsPS7) { $req.SkipCertificateCheck = $true; if (-not $b64) { $req.Authentication = 'Basic' } } else { $req.UseBasicParsing = $true }
     try {

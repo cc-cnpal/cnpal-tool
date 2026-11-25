@@ -18,7 +18,7 @@
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Version = '1.0.3'
+$Version = '1.0.4'
 $GapMs   = 700          # pause between calls
 $SlowMs  = 5000         # endpoints slower than this are set aside if faster ones work
 
@@ -133,7 +133,7 @@ function Invoke-CC([string]$method, [string]$path) {
   $wait = $GapMs - ((Get-Date) - $script:LastCall).TotalMilliseconds
   if ($wait -gt 0) { Start-Sleep -Milliseconds ([int]$wait) }
   $script:LastCall = Get-Date
-  $req = @{ Method = $method; Uri = ($script:Base + $path); TimeoutSec = 90
+  $req = @{ Method = $method; Uri = ($script:Base + $path); MaximumRedirection = 0; TimeoutSec = 90
             Headers = @{ 'X-Auth-Token' = $script:Token; 'Accept' = 'application/json' } }
   if ($script:IsPS7) { $req.SkipCertificateCheck = $true } else { $req.UseBasicParsing = $true }
   for ($attempt = 1; $attempt -le 3; $attempt++) {
@@ -165,7 +165,7 @@ function Connect-CC {
   try { $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${user}:${pass}")) } catch {}
   foreach ($p in @('/dna/system/api/v1/auth/token', '/api/system/v1/auth/token')) {
     Assert-ReadOnly 'POST' $p
-    $req = @{ Method = 'POST'; Uri = ($script:Base + $p); TimeoutSec = 60; ContentType = 'application/json' }
+    $req = @{ Method = 'POST'; Uri = ($script:Base + $p); MaximumRedirection = 0; TimeoutSec = 60; ContentType = 'application/json' }
     if ($b64) { $req.Headers = @{ Authorization = "Basic $b64" } } else { $req.Credential = $script:Cred }
     if ($script:IsPS7) { $req.SkipCertificateCheck = $true; if (-not $b64) { $req.Authentication = 'Basic' } } else { $req.UseBasicParsing = $true }
     try {
